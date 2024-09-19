@@ -1,0 +1,25 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+httpx = "*"
+rich = "*"
+parsel = "*"
+pyside6 = "*"
+qt-material = "*"
+sqlalchemy = "*"
+toml = "*"
+pandas = "*"
+openpyxl = "*"
+pillow = "*"
+
+[dev-packages]
+blue = "*"
+isort = "*"
+ruff = "*"
+
+[requires]
+python_version = "3.12"
+python_full_version = "3.12.6"

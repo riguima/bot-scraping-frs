@@ -1,8 +1,9 @@
 import sys
+
 from PySide6 import QtWidgets
-from bot_scraping_frs.main_window import MainWindow
 from qt_material import apply_stylesheet
 
+from bot_scraping_frs.main_window import MainWindow
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication([])
