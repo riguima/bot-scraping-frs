@@ -14,6 +14,8 @@ toml = "*"
 pandas = "*"
 openpyxl = "*"
 pillow = "*"
+python-docx = "*"
+pdfkit = "*"
 
 [dev-packages]
 blue = "*"

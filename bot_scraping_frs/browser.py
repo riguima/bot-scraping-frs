@@ -3,7 +3,7 @@ import re
 from asyncio import create_task, gather
 from itertools import count
 
-from httpx import AsyncClient, ConnectError, ConnectTimeout, ReadTimeout
+from httpx import AsyncClient
 from parsel import Selector
 
 
@@ -12,7 +12,6 @@ async def get_all_pages_data(url):
         domain, path = re.findall(r'(https://.+?)/(.+?)$', url, re.DOTALL)[0]
         tasks = []
         for i in count(1):
-            print(i)
             if 'dcp' in url:
                 url = re.sub(re.compile(r'.dcp=\d+'), f'?dcp={i}', url)
             else:
@@ -48,7 +47,7 @@ async def get_page_data(client, url):
                 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0',
             },
         )
-    except (ConnectError, ConnectTimeout, ReadTimeout):
+    except:
         return await get_page_data(client, url)
     selector = Selector(response.text)
     main_data = json.loads(
