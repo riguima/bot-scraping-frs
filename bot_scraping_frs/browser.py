@@ -61,10 +61,14 @@ async def get_page_data(client, url):
     color_code = re.findall(r'colcode=(\d+)', url, re.DOTALL)[0]
     for data in main_data:
         if data['ColVarId'] == color_code:
+            size = ', '.join(
+                [size['SizeName'].split()[0] for size in data['SizeVariants']]
+            )
             return {
                 'url': url,
                 'foto': data['MainImageDetails']['ImgUrlLarge'],
                 'codigo': layer_data['productId'],
                 'descricao': f'{layer_data["pageTitle"]} - {data["ColourName"]}',
                 'valor': data['ProdVarPrices']['SellPriceRaw'],
+                'tamanhos': size,
             }

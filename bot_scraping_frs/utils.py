@@ -35,5 +35,5 @@ def convert_value(value):
     return round(value)
 
 
-def format_number(number):
-    return f'R$ {number:.2f}'.replace('.', ',')
+def format_number(number, symbol):
+    return f'{symbol} {number:.2f}'.replace('.', ',')

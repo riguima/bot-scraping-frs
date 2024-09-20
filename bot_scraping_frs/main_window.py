@@ -7,11 +7,11 @@ from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
-from docx.shared import Cm
+from docx.shared import Cm, Pt
 from httpx import get
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
-from openpyxl.styles import Alignment, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
 from PySide6 import QtCore, QtWidgets
 from sqlalchemy import select
 
@@ -85,14 +85,18 @@ class MainWindow(QtWidgets.QWidget):
                     item_model.foto = item['foto']
                     item_model.codigo = item['codigo']
                     item_model.descricao = item['descricao']
-                    item_model.valor = convert_value(item['valor'])
+                    item_model.compra = item['valor']
+                    item_model.venda = convert_value(item['valor'])
+                    item_model.tamanhos = item['tamanhos']
                 else:
                     item_model = Product(
                         url=item['url'],
                         foto=item['foto'],
                         codigo=item['codigo'],
                         descricao=item['descricao'],
-                        valor=convert_value(item['valor']),
+                        compra=item['valor'],
+                        venda=convert_value(item['valor']),
+                        tamanhos=item['tamanhos'],
                     )
                     session.add(item_model)
             session.commit()
@@ -119,38 +123,35 @@ class MainWindow(QtWidgets.QWidget):
                         'Foto': item.foto,
                         'Código': item.codigo,
                         'Descrição': item.descricao,
-                        'Valor': format_number(item.valor),
+                        'Compra': format_number(item.compra, '£'),
+                        'Venda': format_number(item.venda, 'R$'),
+                        'Tamanhos': item.tamanhos,
                     }
                 )
             df = pd.DataFrame(items)
-            df.to_excel(file_path, index=False)
+            df.to_excel(file_path, index=False, startrow=1)
             wb = load_workbook(file_path)
             ws = wb.active
-            self.set_width_to_content(ws, 'B')
-            self.set_width_to_content(ws, 'C')
-            self.set_width_to_content(ws, 'D')
-            self.set_alignment(ws, 'B')
-            self.set_alignment(ws, 'C')
-            self.set_alignment(ws, 'D')
+            ws.merge_cells('A1:F1')
+            ws['A1'] = 'Catálogo de produtos disponíveis'
             ws.column_dimensions['A'].width = 18
-            fill = PatternFill(
-                fill_type='solid', start_color='000000', end_color='000000'
-            )
-            for column in ws['A1:D1']:
-                for cell in column:
-                    cell.fill = fill
             for cell in ws['A:A']:
                 if cell.row > 10:
                     continue
                 if cell.value and 'http' in cell.value:
+                    url = cell.value
+                    cell.value = ''
                     ws.row_dimensions[cell.row].height = 100
-                    response = get(cell.value, timeout=1000)
+                    response = get(url, timeout=1000)
                     image_content = BytesIO(response.content)
                     image = Image(image_content)
-                    image.width = 130
-                    image.height = 130
-                    cell.value = ''
+                    image.width = 120
+                    image.height = 120
                     ws.add_image(image, f'A{cell.row}')
+            for letter in ['A', 'B', 'C', 'D', 'E', 'F']:
+                self.format_column_cells(ws, letter)
+                if letter != 'A':
+                    self.set_width_to_content(ws, letter)
             wb.save(file_path)
         self.message_box.setText('Finalizado!')
         self.message_box.show()
@@ -168,6 +169,13 @@ class MainWindow(QtWidgets.QWidget):
             section.bottom_margin = Cm(1)
             section.left_margin = Cm(1)
             section.right_margin = Cm(1)
+            paragraph = document.add_paragraph(
+                'Catálogo de produtos disponíveis'
+            )
+            paragraph.text = 'Catálogo de produtos disponíveis'
+            paragraph.runs[0].font.bold = True
+            paragraph.runs[0].font.size = Pt(20)
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
             table = document.add_table(rows=len(products) + 1, cols=4)
             table.cell(0, 0).text = 'Foto'
             table.cell(0, 1).text = 'Código'
@@ -185,17 +193,18 @@ class MainWindow(QtWidgets.QWidget):
             table.cell(0, 3)._tc.get_or_add_tcPr().append(
                 parse_xml(r'<w:shd {} w:fill="000000"/>'.format(nsdecls('w')))
             )
-            self.make_rows_bold(table.rows[0])
-            self.align_rows(table)
             for e, product in enumerate(products[:5]):
                 response = get(product.foto, timeout=1000)
                 image_content = BytesIO(response.content)
-                paragraph = table.cell(e + 1, 0).paragraphs[0]
-                run = paragraph.add_run()
+                run = table.cell(e + 1, 0).paragraphs[0].add_run()
                 run.add_picture(image_content, width=Cm(4))
-                table.cell(e + 1, 1).text = product.codigo
-                table.cell(e + 1, 2).text = product.descricao
-                table.cell(e + 1, 3).text = format_number(product.valor)
+                table.cell(e + 1, 1).add_paragraph(product.codigo)
+                table.cell(e + 1, 2).add_paragraph(product.descricao)
+                table.cell(e + 1, 3).add_paragraph(
+                    format_number(product.venda, 'R$')
+                )
+            self.make_rows_bold(table.rows[0])
+            self.format_table_rows(table)
             document.save(file_path)
         self.message_box.setText('Finalizado!')
         self.message_box.show()
@@ -207,10 +216,21 @@ class MainWindow(QtWidgets.QWidget):
                 max_length = len(str(cell.value))
         ws.column_dimensions[column].width = max_length + 2
 
-    def set_alignment(self, ws, column):
+    def format_column_cells(self, ws, column):
+        fill = PatternFill(
+            fill_type='solid', start_color='000000', end_color='000000'
+        )
         alignment = Alignment(horizontal='center', vertical='center')
         for cell in ws[f'{column}:{column}']:
+            if cell.row == 1:
+                cell.font = Font(size=20, bold=True)
+                cell.alignment = alignment
+                continue
+            elif cell.row == 2:
+                cell.font = Font(size=12, bold=True)
+                cell.fill = fill
             cell.alignment = alignment
+            cell.font = Font(size=12)
 
     def make_rows_bold(self, *rows):
         for row in rows:
@@ -219,9 +239,11 @@ class MainWindow(QtWidgets.QWidget):
                     for run in paragraph.runs:
                         run.font.bold = True
 
-    def align_rows(self, table):
+    def format_table_rows(self, table):
         for row in table.rows:
             for cell in row.cells:
+                cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                 for paragraph in cell.paragraphs:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    paragraph.alignment = WD_ALIGN_VERTICAL.CENTER
+                    for run in paragraph.runs:
+                        run.font.size = Pt(12)

@@ -14,7 +14,9 @@ class Product(Base):
     foto: Mapped[str]
     codigo: Mapped[str]
     descricao: Mapped[str]
-    valor: Mapped[float]
+    compra: Mapped[float]
+    venda: Mapped[float]
+    tamanhos: Mapped[str]
 
 
 Base.metadata.create_all(db)
