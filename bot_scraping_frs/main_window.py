@@ -136,8 +136,6 @@ class MainWindow(QtWidgets.QWidget):
             ws['A1'] = 'Catálogo de produtos disponíveis'
             ws.column_dimensions['A'].width = 18
             for cell in ws['A:A']:
-                if cell.row > 10:
-                    continue
                 if cell.value and 'http' in cell.value:
                     url = cell.value
                     cell.value = ''
@@ -193,7 +191,7 @@ class MainWindow(QtWidgets.QWidget):
             table.cell(0, 3)._tc.get_or_add_tcPr().append(
                 parse_xml(r'<w:shd {} w:fill="000000"/>'.format(nsdecls('w')))
             )
-            for e, product in enumerate(products[:5]):
+            for e, product in enumerate(products):
                 response = get(product.foto, timeout=1000)
                 image_content = BytesIO(response.content)
                 run = table.cell(e + 1, 0).paragraphs[0].add_run()
