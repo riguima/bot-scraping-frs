@@ -17,8 +17,11 @@ from sqlalchemy import select
 from bot_scraping_frs.browser import get_all_pages_data
 from bot_scraping_frs.database import Session
 from bot_scraping_frs.models import Product
-from bot_scraping_frs.utils import (convert_value, format_number,
-                                    get_all_images_content)
+from bot_scraping_frs.utils import (
+    convert_value,
+    format_number,
+    get_all_images_content,
+)
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -72,6 +75,9 @@ class MainWindow(QtWidgets.QWidget):
         self.message_box.setText('Aguarde...')
         self.message_box.exec()
         with Session() as session:
+            for product in session.scalars(select(Product)).all():
+                session.delete(product)
+            session.commit()
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             data = loop.run_until_complete(
@@ -79,16 +85,7 @@ class MainWindow(QtWidgets.QWidget):
             )
             loop.close()
             for item in data:
-                query = select(Product).where(Product.url == item['url'])
-                item_model = session.scalars(query).first()
-                if item_model:
-                    item_model.foto = item['foto']
-                    item_model.codigo = item['codigo']
-                    item_model.descricao = item['descricao']
-                    item_model.compra = item['valor']
-                    item_model.venda = convert_value(item['valor'])
-                    item_model.tamanhos = item['tamanhos']
-                else:
+                if item:
                     item_model = Product(
                         url=item['url'],
                         foto=item['foto'],
@@ -134,16 +131,14 @@ class MainWindow(QtWidgets.QWidget):
             ws = wb.active
             ws.merge_cells('A1:F1')
             ws['A1'] = 'Catálogo de produtos disponíveis'
-            ws.column_dimensions['A'].width = 18
+            ws.column_dimensions['A'].width = 14
             images_contents = self.get_images_contents()
             for image_content, cell in zip(
                 images_contents, ws[f'A3:A{len(images_contents) + 2}']
             ):
                 cell[0].value = ''
-                ws.row_dimensions[cell[0].row].height = 100
+                ws.row_dimensions[cell[0].row].height = 90
                 image = Image(BytesIO(image_content))
-                image.width = 120
-                image.height = 120
                 ws.add_image(image, f'A{cell[0].row}')
             for letter in ['A', 'B', 'C', 'D', 'E', 'F']:
                 self.format_column_cells(ws, letter)
@@ -193,7 +188,7 @@ class MainWindow(QtWidgets.QWidget):
             images_contents = self.get_images_contents()
             for e, product in enumerate(products):
                 run = table.cell(e + 1, 0).paragraphs[0].add_run()
-                run.add_picture(BytesIO(images_contents[e]), width=Cm(4))
+                run.add_picture(BytesIO(images_contents[e]), width=Cm(3))
                 table.cell(e + 1, 1).add_paragraph(product.codigo)
                 table.cell(e + 1, 2).add_paragraph(product.descricao)
                 table.cell(e + 1, 3).add_paragraph(

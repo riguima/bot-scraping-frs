@@ -50,9 +50,12 @@ async def get_page_data(client, url):
     except:
         return await get_page_data(client, url)
     selector = Selector(response.text)
-    main_data = json.loads(
-        selector.css('.ProductDetailsVariants').attrib['data-variants']
-    )
+    try:
+        main_data = json.loads(
+            selector.css('.ProductDetailsVariants').attrib['data-variants']
+        )
+    except KeyError:
+        return
     layer_data = json.loads(
         re.findall(
             r'var dataLayerData = (\{.+?\})\;', response.text, re.DOTALL
@@ -66,9 +69,20 @@ async def get_page_data(client, url):
             )
             return {
                 'url': url,
-                'foto': data['MainImageDetails']['ImgUrlLarge'],
+                'foto': data['MainImageDetails']['ImgUrlThumb'],
                 'codigo': layer_data['productId'],
-                'descricao': f'{layer_data["pageTitle"]} - {data["ColourName"]}',
+                'descricao': data['MainImageDetails']['AltText'],
                 'valor': data['ProdVarPrices']['SellPriceRaw'],
                 'tamanhos': size,
             }
+    size = ', '.join(
+        [size['SizeName'].split()[0] for size in main_data[0]['SizeVariants']]
+    )
+    return {
+        'url': url,
+        'foto': main_data[0]['MainImageDetails']['ImgUrlThumb'],
+        'codigo': layer_data['productId'],
+        'descricao': data['MainImageDetails']['AltText'],
+        'valor': main_data[0]['ProdVarPrices']['SellPriceRaw'],
+        'tamanhos': size,
+    }
