@@ -1,4 +1,6 @@
-from httpx import get
+from asyncio import create_task, gather
+
+from httpx import AsyncClient, get
 
 
 def convert_value(value):
@@ -37,3 +39,20 @@ def convert_value(value):
 
 def format_number(number, symbol):
     return f'{symbol} {number:.2f}'.replace('.', ',')
+
+
+async def get_image_content(client, image_url):
+    try:
+        response = await client.get(image_url, timeout=1000)
+    except:
+        return await get_image_content(client, image_url)
+    return response.content
+
+
+async def get_all_images_content(images_urls):
+    tasks = []
+    async with AsyncClient() as client:
+        for image_url in images_urls:
+            tasks.append(create_task(get_image_content(client, image_url)))
+        response = await gather(*tasks)
+        return response

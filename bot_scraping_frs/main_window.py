@@ -8,7 +8,6 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
 from docx.shared import Cm, Pt
-from httpx import get
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -18,7 +17,8 @@ from sqlalchemy import select
 from bot_scraping_frs.browser import get_all_pages_data
 from bot_scraping_frs.database import Session
 from bot_scraping_frs.models import Product
-from bot_scraping_frs.utils import convert_value, format_number
+from bot_scraping_frs.utils import (convert_value, format_number,
+                                    get_all_images_content)
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -135,17 +135,16 @@ class MainWindow(QtWidgets.QWidget):
             ws.merge_cells('A1:F1')
             ws['A1'] = 'Catálogo de produtos disponíveis'
             ws.column_dimensions['A'].width = 18
-            for cell in ws['A:A']:
-                if cell.value and 'http' in cell.value:
-                    url = cell.value
-                    cell.value = ''
-                    ws.row_dimensions[cell.row].height = 100
-                    response = get(url, timeout=1000)
-                    image_content = BytesIO(response.content)
-                    image = Image(image_content)
-                    image.width = 120
-                    image.height = 120
-                    ws.add_image(image, f'A{cell.row}')
+            images_contents = self.get_images_contents()
+            for image_content, cell in zip(
+                images_contents, ws[f'A3:A{len(images_contents) + 2}']
+            ):
+                cell[0].value = ''
+                ws.row_dimensions[cell[0].row].height = 100
+                image = Image(BytesIO(image_content))
+                image.width = 120
+                image.height = 120
+                ws.add_image(image, f'A{cell[0].row}')
             for letter in ['A', 'B', 'C', 'D', 'E', 'F']:
                 self.format_column_cells(ws, letter)
                 if letter != 'A':
@@ -157,8 +156,8 @@ class MainWindow(QtWidgets.QWidget):
     @QtCore.Slot()
     def export_to_pdf(self):
         file_path = QtWidgets.QFileDialog.getSaveFileName()[0]
-        if '.pdf' not in file_path:
-            file_path = file_path + '.pdf'
+        if '.docx' not in file_path:
+            file_path = file_path + '.docx'
         with Session() as session:
             products = session.scalars(select(Product)).all()
             document = Document()
@@ -191,11 +190,10 @@ class MainWindow(QtWidgets.QWidget):
             table.cell(0, 3)._tc.get_or_add_tcPr().append(
                 parse_xml(r'<w:shd {} w:fill="000000"/>'.format(nsdecls('w')))
             )
+            images_contents = self.get_images_contents()
             for e, product in enumerate(products):
-                response = get(product.foto, timeout=1000)
-                image_content = BytesIO(response.content)
                 run = table.cell(e + 1, 0).paragraphs[0].add_run()
-                run.add_picture(image_content, width=Cm(4))
+                run.add_picture(BytesIO(images_contents[e]), width=Cm(4))
                 table.cell(e + 1, 1).add_paragraph(product.codigo)
                 table.cell(e + 1, 2).add_paragraph(product.descricao)
                 table.cell(e + 1, 3).add_paragraph(
@@ -245,3 +243,16 @@ class MainWindow(QtWidgets.QWidget):
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     for run in paragraph.runs:
                         run.font.size = Pt(12)
+
+    def get_images_contents(self):
+        with Session() as session:
+            images_urls = [
+                product.foto
+                for product in session.scalars(select(Product)).all()
+            ]
+            loop = asyncio.new_event_loop()
+            result = loop.run_until_complete(
+                get_all_images_content(images_urls)
+            )
+            loop.close()
+            return result
