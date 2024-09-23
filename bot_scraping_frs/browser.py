@@ -39,6 +39,32 @@ async def get_all_pages_data(url):
         return response
 
 
+async def get_all_pages_data_lovellsoccer(url):
+    async with AsyncClient() as client:
+        tasks = []
+        try:
+            url = re.findall(r'(.+)#', url, re.DOTALL)[0]
+        except IndexError:
+            pass
+        url += '/page/all'
+        response = await client.get(
+            url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0',
+            },
+        )
+        selector = Selector(response.text)
+        items = selector.css('.item.clearfix a')
+        urls = []
+        for item in items:
+            if item.attrib['href'] not in urls:
+                urls.append(item.attrib['href'])
+        for url in urls:
+            tasks.append(create_task(get_page_data_lovellsoccer(client, url)))
+        response = await gather(*tasks)
+        return response
+
+
 async def get_page_data(client, url):
     try:
         response = await client.get(
@@ -82,7 +108,34 @@ async def get_page_data(client, url):
         'url': url,
         'foto': main_data[0]['MainImageDetails']['ImgUrlThumb'],
         'codigo': layer_data['productId'],
-        'descricao': data['MainImageDetails']['AltText'],
+        'descricao': main_data[0]['MainImageDetails']['AltText'],
         'valor': main_data[0]['ProdVarPrices']['SellPriceRaw'],
         'tamanhos': size,
+    }
+
+
+async def get_page_data_lovellsoccer(client, url):
+    try:
+        response = await client.get(
+            url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0',
+            },
+        )
+    except:
+        return await get_page_data_lovellsoccer(client, url)
+    selector = Selector(response.text)
+    data = json.loads(
+        selector.css('script[type="application/ld+json"]::text').get()
+    )
+    code = re.findall(r'/(\d+)$', url)[0]
+    return {
+        'url': url,
+        'foto': f'https://lovellcdn.b-cdn.net/products/{code}.jpg?width=90',
+        'codigo': code,
+        'descricao': data['name'],
+        'valor': float(data['offers']['price']),
+        'tamanhos': ', '.join(
+            selector.css('.orderButton.size span::text').getall()
+        ),
     }

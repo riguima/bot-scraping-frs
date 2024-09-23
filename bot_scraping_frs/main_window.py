@@ -14,14 +14,12 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from PySide6 import QtCore, QtWidgets
 from sqlalchemy import select
 
-from bot_scraping_frs.browser import get_all_pages_data
+from bot_scraping_frs.browser import (get_all_pages_data,
+                                      get_all_pages_data_lovellsoccer)
 from bot_scraping_frs.database import Session
 from bot_scraping_frs.models import Product
-from bot_scraping_frs.utils import (
-    convert_value,
-    format_number,
-    get_all_images_content,
-)
+from bot_scraping_frs.utils import (convert_value, format_number,
+                                    get_all_images_content)
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -80,9 +78,14 @@ class MainWindow(QtWidgets.QWidget):
             session.commit()
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            data = loop.run_until_complete(
-                get_all_pages_data(self.url_input.text())
-            )
+            if 'lovellsoccer':
+                data = loop.run_until_complete(
+                    get_all_pages_data_lovellsoccer(self.url_input.text())
+                )
+            else:
+                data = loop.run_until_complete(
+                    get_all_pages_data(self.url_input.text())
+                )
             loop.close()
             for item in data:
                 if item:
