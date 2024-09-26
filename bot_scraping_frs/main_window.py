@@ -11,6 +11,7 @@ from docx.shared import Cm, Pt
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment, Font, PatternFill
+from PIL import UnidentifiedImageError
 from PySide6 import QtCore, QtWidgets
 from sqlalchemy import select
 
@@ -78,7 +79,10 @@ class MainWindow(QtWidgets.QWidget):
             session.commit()
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            if 'lovellsoccer':
+            if (
+                'lovellsoccer' in self.url_input.text()
+                or 'lovellsports' in self.url_input.text()
+            ):
                 data = loop.run_until_complete(
                     get_all_pages_data_lovellsoccer(self.url_input.text())
                 )
@@ -141,8 +145,11 @@ class MainWindow(QtWidgets.QWidget):
             ):
                 cell[0].value = ''
                 ws.row_dimensions[cell[0].row].height = 90
-                image = Image(BytesIO(image_content))
-                ws.add_image(image, f'A{cell[0].row}')
+                try:
+                    image = Image(BytesIO(image_content))
+                    ws.add_image(image, f'A{cell[0].row}')
+                except UnidentifiedImageError:
+                    continue
             for letter in ['A', 'B', 'C', 'D', 'E', 'F']:
                 self.format_column_cells(ws, letter)
                 if letter != 'A':

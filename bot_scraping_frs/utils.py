@@ -43,7 +43,13 @@ def format_number(number, symbol):
 
 async def get_image_content(client, image_url):
     try:
-        response = await client.get(image_url, timeout=1000)
+        response = await client.get(
+            image_url,
+            timeout=1000,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0',
+            },
+        )
     except:
         return await get_image_content(client, image_url)
     return response.content

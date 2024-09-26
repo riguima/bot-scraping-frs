@@ -11,6 +11,7 @@ async def get_all_pages_data(url):
     async with AsyncClient() as client:
         domain, path = re.findall(r'(https://.+?)/(.+?)$', url, re.DOTALL)[0]
         tasks = []
+        items_selector = 1
         for i in count(1):
             if 'dcp' in url:
                 url = re.sub(re.compile(r'.dcp=\d+'), f'?dcp={i}', url)
@@ -24,6 +25,13 @@ async def get_all_pages_data(url):
             )
             selector = Selector(response.text)
             items = selector.css('.ProductImageList')
+            if i == 1 and not items or items_selector == 2:
+                items = selector.css('.ProductCardForGrid_productCardSkeletonLink__12uxY')
+                items.extend(selector.css('.ProductCard_link__cCkNX'))
+                items_selector = 2
+                breakpoint()
+            print(i)
+            print(len(items))
             if items:
                 for item in items:
                     tasks.append(
@@ -36,6 +44,7 @@ async def get_all_pages_data(url):
             else:
                 break
         response = await gather(*tasks)
+        print(response)
         return response
 
 
@@ -59,9 +68,30 @@ async def get_all_pages_data_lovellsoccer(url):
         for item in items:
             if item.attrib['href'] not in urls:
                 urls.append(item.attrib['href'])
-        for url in urls:
-            tasks.append(create_task(get_page_data_lovellsoccer(client, url)))
+        for item_url in urls:
+            tasks.append(
+                create_task(get_page_data_lovellsoccer(client, item_url))
+            )
         response = await gather(*tasks)
+        indexes = []
+        for _ in range(10):
+            tasks = []
+            for i, item in enumerate(response):
+                if item is None and i not in indexes:
+                    tasks.append(
+                        create_task(
+                            get_page_data_lovellsoccer(client, urls[i])
+                        )
+                    )
+            remain = await gather(*tasks)
+            indexes.extend([urls.index(r['url']) for r in remain if r])
+            response.extend([r for r in remain if r])
+            if [r for r in remain if r is None]:
+                continue
+            for index in indexes:
+                response.pop(index)
+            break
+        response = [r for r in response if r]
         return response
 
 
@@ -123,11 +153,14 @@ async def get_page_data_lovellsoccer(client, url):
             },
         )
     except:
-        return await get_page_data_lovellsoccer(client, url)
+        return
     selector = Selector(response.text)
-    data = json.loads(
-        selector.css('script[type="application/ld+json"]::text').get()
-    )
+    try:
+        data = json.loads(
+            selector.css('script[type="application/ld+json"]::text').get()
+        )
+    except TypeError:
+        return
     code = re.findall(r'/(\d+)$', url)[0]
     return {
         'url': url,
