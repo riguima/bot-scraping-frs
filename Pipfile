@@ -16,6 +16,8 @@ openpyxl = "*"
 pillow = "*"
 python-docx = "*"
 pdfkit = "*"
+undetected-chromedriver = "*"
+setuptools = "*"
 
 [dev-packages]
 blue = "*"

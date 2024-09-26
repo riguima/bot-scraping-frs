@@ -147,6 +147,8 @@ class MainWindow(QtWidgets.QWidget):
                 ws.row_dimensions[cell[0].row].height = 90
                 try:
                     image = Image(BytesIO(image_content))
+                    image.width = 100
+                    image.height = 100
                     ws.add_image(image, f'A{cell[0].row}')
                 except UnidentifiedImageError:
                     continue
