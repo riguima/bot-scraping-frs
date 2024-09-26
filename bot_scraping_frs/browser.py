@@ -20,9 +20,15 @@ async def get_all_pages_data(url):
         tasks = []
         items_selector = 1
         for i in count(1):
-            if 'dcp' in url:
+            if 'dcp' in url and '#' in url:
                 url = re.sub(re.compile(r'.dcp=\d+'), f'#dcp={i}', url)
+            elif 'dcp' not in url and '#' not in url:
+                url += f'?dcp={i}'
+            else:
+                url = re.sub(re.compile(r'.dcp=\d+'), f'?dcp={i}', url)
             driver.get(url)
+            if 'dcp' not in driver.current_url and i > 1:
+                break
             sleep(1)
             items = driver.find_elements(By.CSS_SELECTOR, '.ProductImageList')
             if i == 1 and not items or items_selector == 2:
@@ -73,19 +79,19 @@ async def get_all_pages_data_lovellsoccer(url):
             for item in items:
                 if item.get_attribute('href') not in urls:
                     urls.append(item.get_attribute('href'))
-            for item_url in urls:
-                tasks.append(
-                    create_task(get_page_data_lovellsoccer(client, item_url))
-                )
+        for item_url in urls:
+            tasks.append(
+                create_task(get_page_data_lovellsoccer(client, item_url))
+            )
         response = await gather(*tasks)
         indexes = []
         for _ in range(10):
             tasks = []
-            for i, item in enumerate(response):
-                if item is None and i not in indexes:
+            for url, item in zip(urls, response):
+                if item is None and urls.index(url) not in indexes:
                     tasks.append(
                         create_task(
-                            get_page_data_lovellsoccer(client, urls[i])
+                            get_page_data_lovellsoccer(client, url)
                         )
                     )
             remain = await gather(*tasks)
@@ -177,6 +183,7 @@ async def get_page_data(client, url):
 
 
 async def get_page_data_lovellsoccer(client, url):
+    print(url)
     try:
         response = await client.get(
             url,
@@ -185,6 +192,7 @@ async def get_page_data_lovellsoccer(client, url):
             },
         )
     except:
+        print(None)
         return
     selector = Selector(response.text)
     try:
