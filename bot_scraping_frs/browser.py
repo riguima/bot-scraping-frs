@@ -146,7 +146,7 @@ async def get_page_data(client, url):
                     'url': url,
                     'foto': f'{domain}images/products/{data["gtin8"]}_piat.jpg',
                     'codigo': data['gtin8'],
-                    'descricao': f'{data["itemOffered"]["name"]} - {data["itemOffered"]["color"]}',
+                    'descricao': data['itemOffered']['name'],
                     'valor': float(data['price']),
                     'tamanhos': size,
                 }

@@ -1,6 +1,6 @@
 from asyncio import create_task, gather
 
-from httpx import AsyncClient, get
+from httpx import AsyncClient, get, Timeout, Limits
 
 
 def convert_value(value):
@@ -45,7 +45,7 @@ async def get_image_content(client, image_url):
     try:
         response = await client.get(
             image_url,
-            timeout=1000,
+            timeout=10,
             headers={
                 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0',
             },
@@ -57,7 +57,10 @@ async def get_image_content(client, image_url):
 
 async def get_all_images_content(images_urls):
     tasks = []
-    async with AsyncClient() as client:
+    async with AsyncClient(
+        timeout=Timeout(10, pool=10),
+        limits=Limits(max_connections=100, max_keepalive_connections=0),
+    ) as client:
         for image_url in images_urls:
             tasks.append(create_task(get_image_content(client, image_url)))
         response = await gather(*tasks)
