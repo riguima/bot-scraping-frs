@@ -19,16 +19,8 @@ async def get_all_pages_data(url):
     ) as client:
         tasks = []
         items_selector = 1
+        driver.get(url)
         for i in count(1):
-            if 'dcp' in url and '#' in url:
-                url = re.sub(re.compile(r'.dcp=\d+'), f'#dcp={i}', url)
-            elif 'dcp' not in url and '#' not in url:
-                url += f'?dcp={i}'
-            else:
-                url = re.sub(re.compile(r'.dcp=\d+'), f'?dcp={i}', url)
-            driver.get(url)
-            if 'dcp' not in driver.current_url and i > 1:
-                break
             sleep(1)
             items = driver.find_elements(By.CSS_SELECTOR, '.ProductImageList')
             if i == 1 and not items or items_selector == 2:
@@ -51,6 +43,18 @@ async def get_all_pages_data(url):
                     )
             else:
                 break
+            if items_selector == 1:
+                buttons = driver.find_elements(By.CSS_SELECTOR, '.swipeNextClick')
+                if buttons:
+                    driver.execute_script('arguments[0].click()', buttons[0])
+                else:
+                    break
+            else:
+                button = driver.find_element(By.CSS_SELECTOR, 'a[data-testid="next-item"]')
+                if button.get_attribute('tabindex') == '0':
+                    driver.execute_script('arguments[0].click()', button)
+                else:
+                    break
         response = await gather(*tasks)
         return response
 
@@ -90,9 +94,7 @@ async def get_all_pages_data_lovellsoccer(url):
             for url, item in zip(urls, response):
                 if item is None and urls.index(url) not in indexes:
                     tasks.append(
-                        create_task(
-                            get_page_data_lovellsoccer(client, url)
-                        )
+                        create_task(get_page_data_lovellsoccer(client, url))
                     )
             remain = await gather(*tasks)
             indexes.extend([urls.index(r['url']) for r in remain if r])
@@ -131,7 +133,7 @@ async def get_page_data(client, url):
             )
         except IndexError:
             return
-        domain = re.findall(r'https://.+?/', url, re.DOTALL)
+        domain = re.findall(r'https://.+?/', url, re.DOTALL)[0]
         for data in json_data['offers']['offers']:
             if data['gtin8'] == color_code:
                 size = ', '.join(
@@ -146,7 +148,7 @@ async def get_page_data(client, url):
                     'url': url,
                     'foto': f'{domain}images/products/{data["gtin8"]}_piat.jpg',
                     'codigo': data['gtin8'],
-                    'descricao': data['itemOffered']['name'],
+                    'descricao': f'{data["itemOffered"]["name"]} - {data["itemOffered"]["color"]}',
                     'valor': float(data['price']),
                     'tamanhos': size,
                 }
@@ -159,31 +161,38 @@ async def get_page_data(client, url):
     for data in main_data:
         if data['ColVarId'] == color_code:
             size = ', '.join(
-                [size['SizeName'].split()[0] for size in data['SizeVariants']]
+                [
+                    size['SizeName'].split()[0]
+                    for size in data['SizeVariants']
+                    if size['InStock']
+                ]
             )
             return {
                 'url': url,
                 'foto': data['MainImageDetails']['ImgUrlThumb'],
                 'codigo': layer_data['productId'],
-                'descricao': data['MainImageDetails']['AltText'],
+                'descricao': f'{layer_data["productName"]} - {data["ColourName"]}',
                 'valor': data['ProdVarPrices']['SellPriceRaw'],
                 'tamanhos': size,
             }
     size = ', '.join(
-        [size['SizeName'].split()[0] for size in main_data[0]['SizeVariants']]
+        [
+            size['SizeName'].split()[0]
+            for size in main_data[0]['SizeVariants']
+            if size['InStock']
+        ]
     )
     return {
         'url': url,
         'foto': main_data[0]['MainImageDetails']['ImgUrlThumb'],
         'codigo': layer_data['productId'],
-        'descricao': main_data[0]['MainImageDetails']['AltText'],
+        'descricao': f'{layer_data["productName"]} - {main_data[0]["ColourName"]}',
         'valor': main_data[0]['ProdVarPrices']['SellPriceRaw'],
         'tamanhos': size,
     }
 
 
 async def get_page_data_lovellsoccer(client, url):
-    print(url)
     try:
         response = await client.get(
             url,
@@ -192,7 +201,6 @@ async def get_page_data_lovellsoccer(client, url):
             },
         )
     except:
-        print(None)
         return
     selector = Selector(response.text)
     try:
@@ -201,7 +209,7 @@ async def get_page_data_lovellsoccer(client, url):
         )
     except TypeError:
         return
-    domain = re.findall(r'https://.+?/', url, re.DOTALL)
+    domain = re.findall(r'https://.+?/', url, re.DOTALL)[0]
     code = re.findall(r'/(\d+)$', url)[0]
     return {
         'url': url,

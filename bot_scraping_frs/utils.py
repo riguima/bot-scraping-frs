@@ -1,6 +1,6 @@
 from asyncio import create_task, gather
 
-from httpx import AsyncClient, get, Timeout, Limits
+from httpx import AsyncClient, Limits, Timeout, get
 
 
 def convert_value(value):
